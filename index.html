@@ -46,7 +46,7 @@
             </div>
             <div>
                 <h1 class="font-mono font-bold text-xl md:text-2xl tracking-wider text-white uppercase flex items-center gap-2">
-                    <span>LIVE</span> <span class="text-tech-accent">//</span> VOLBY.GOV.CZ_MONITOR_2026
+                    <span>LIVE</span> <span class="text-tech-accent">//</span> VOLBY.GOV.CZ_MONITOR
                 </h1>
                 <p class="text-sm text-slate-400 font-mono" id="xml-status">Připojování k volby.gov.cz...</p>
             </div>
@@ -81,7 +81,7 @@
             <div class="pb-3.5 border-b border-tech-border mb-4 flex items-center justify-between">
                 <div>
                     <span class="text-xs text-tech-accent font-mono">SLOUPEC 01</span>
-                    <h2 id="title-col-1" class="font-bold text-xl text-slate-100 uppercase truncate max-w-[280px]">Obec A</h2>
+                    <h2 id="title-col-1" class="font-bold text-xl text-slate-100 uppercase truncate max-w-[280px]">OBEC A</h2>
                 </div>
             </div>
             <div class="mb-4 relative">
@@ -97,7 +97,7 @@
             <div class="pb-3.5 border-b border-tech-border mb-4 flex items-center justify-between">
                 <div>
                     <span class="text-xs text-tech-accent font-mono">SLOUPEC 02</span>
-                    <h2 id="title-col-2" class="font-bold text-xl text-slate-100 uppercase truncate max-w-[280px]">Obec B</h2>
+                    <h2 id="title-col-2" class="font-bold text-xl text-slate-100 uppercase truncate max-w-[280px]">OBEC B</h2>
                 </div>
             </div>
             <div class="mb-4 relative">
@@ -113,7 +113,7 @@
             <div class="pb-3.5 border-b border-tech-border mb-4 flex items-center justify-between">
                 <div>
                     <span class="text-xs text-purple-400 font-mono">SLOUPEC 03</span>
-                    <h2 id="title-col-3" class="font-bold text-xl text-purple-200 uppercase truncate max-w-[280px]">Senátní obvod</h2>
+                    <h2 id="title-col-3" class="font-bold text-xl text-purple-200 uppercase truncate max-w-[280px]">SENÁTNÍ OBVOD</h2>
                 </div>
             </div>
             <div class="mb-4 relative">
@@ -130,39 +130,60 @@
         let kvXmlData = null;
         let seXmlData = null;
 
+        // Pomocná funkce pro stahování přes proxy
+        async function fetchWithProxy(url) {
+            const proxy1 = 'https://corsproxy.io/?' + encodeURIComponent(url);
+            const proxy2 = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+
+            try {
+                let res = await fetch(proxy1 + '&_t=' + new Date().getTime());
+                if (res.ok) return await res.text();
+            } catch (e) {
+                console.warn("Proxy 1 selhala, zkouším záložní proxy 2...", e);
+            }
+
+            try {
+                let res = await fetch(proxy2 + '&_t=' + new Date().getTime());
+                if (res.ok) return await res.text();
+            } catch (e) {
+                console.error("I záložní proxy selhala:", e);
+            }
+
+            return null;
+        }
+
         async function fetchAllData() {
             const kvUrl = document.getElementById('target-kv-url').value;
             const seUrl = document.getElementById('target-se-url').value;
             const statusEl = document.getElementById('xml-status');
 
-            statusEl.innerText = "Stahuji aktuální XML 2026 z volby.gov.cz...";
+            statusEl.innerText = "Stahuji data z volby.gov.cz...";
 
             try {
-                const kvProxy = 'https://corsproxy.io/?' + encodeURIComponent(kvUrl);
-                try {
-                    const kvRes = await fetch(kvProxy + '&_t=' + new Date().getTime());
-                    if (kvRes.ok) {
-                        const kvText = await kvRes.text();
-                        kvXmlData = new DOMParser().parseFromString(kvText, "text/xml");
-                    }
-                } catch (kvErr) { console.error("Chyba načítání obecních dat:", kvErr); }
+                // Načtení obecních dat
+                const kvText = await fetchWithProxy(kvUrl);
+                if (kvText) {
+                    kvXmlData = new DOMParser().parseFromString(kvText, "text/xml");
+                }
 
-                const seProxy = 'https://corsproxy.io/?' + encodeURIComponent(seUrl);
-                try {
-                    const seRes = await fetch(seProxy + '&_t=' + new Date().getTime());
-                    if (seRes.ok) {
-                        const seText = await seRes.text();
-                        seXmlData = new DOMParser().parseFromString(seText, "text/xml");
-                    }
-                } catch (seErr) { console.error("Chyba načítání senátních dat:", seErr); }
+                // Načtení senátních dat
+                const seText = await fetchWithProxy(seUrl);
+                if (seText) {
+                    seXmlData = new DOMParser().parseFromString(seText, "text/xml");
+                }
 
-                statusEl.innerText = "Data 2026 aktualizována v " + new Date().toLocaleTimeString();
-                statusEl.className = "text-sm text-tech-success font-mono";
-
-                populateDropdowns();
+                if (kvXmlData || seXmlData) {
+                    statusEl.innerText = "Aktualizováno v " + new Date().toLocaleTimeString();
+                    statusEl.className = "text-sm text-tech-success font-mono";
+                    populateDropdowns();
+                } else {
+                    statusEl.innerText = "Data zatím nejsou na volby.gov.cz dostupná (XML neexistuje).";
+                    statusEl.className = "text-sm text-tech-warning font-mono";
+                }
 
             } catch (err) {
-                statusEl.innerText = "Soubor na volby.gov.cz ještě není připraven nebo probíhá údržba serveru.";
+                console.error("Chyba při aktualizaci:", err);
+                statusEl.innerText = "Chyba připojení k serveru.";
                 statusEl.className = "text-sm text-tech-warning font-mono";
             }
         }
@@ -183,7 +204,7 @@
                             const opt = document.createElement('option');
                             opt.value = kod;
                             opt.innerText = `${nazev} (${kod})`;
-                            opt.dataset.cleanName = nazev; // Uložíme si pouze čistý název obce
+                            opt.dataset.cleanName = nazev;
                             select.appendChild(opt);
                         }
                     });
@@ -237,7 +258,6 @@
             const selectedOption = select.options[select.selectedIndex];
             const cleanName = selectedOption.dataset.cleanName || selectedOption.text;
             
-            // Dynamicky přepíšeme velký nadpis sloupce
             titleEl.innerText = cleanName;
 
             let isProcessed = false;
@@ -262,7 +282,7 @@
                                 <div class="mb-2.5">
                                     <div class="flex justify-between text-sm font-mono mb-1.5">
                                         <span class="text-slate-300 font-semibold">${nazev}</span>
-                                        <span class="text-slate-400">${proc}% <span class="text-slate-500">(${hlasy} h.${mandaty ? ' | Mandáty: ' + mandaty : ''})</span></span>
+                                        <span class="text-slate-400">${proc}% <span class="text-slate-500">(${hlasy} h. ${mandaty ? ' | Mandáty: ' + mandaty : ''})</span></span>
                                     </div>
                                     <div class="w-full h-2 bg-tech-base rounded-full overflow-hidden">
                                         <div class="h-full ${colId === 3 ? 'bg-purple-500' : 'bg-tech-accent'} rounded-full" style="width: ${proc}%"></div>
@@ -285,4 +305,30 @@
                     </div>`;
             } else {
                 container.innerHTML = `
-                    <div class="tech-glow-card bg-
+                    <div class="tech-glow-card bg-tech-base/80 p-5 rounded-lg">
+                        <div class="flex justify-between items-center mb-3.5">
+                            <h3 class="font-bold text-base text-slate-100">${cleanName}</h3>
+                            <span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-tech-warning/10 text-tech-warning border border-tech-warning/30 animate-pulse">SČÍTÁ SE</span>
+                        </div>
+                        <div class="p-5 bg-tech-base/40 rounded border border-tech-border/40 text-center text-sm font-mono text-slate-500">
+                            V XML souboru z volby.gov.cz zatím pro tuto položku nebyly publikovány podrobné výsledky.
+                        </div>
+                    </div>`;
+            }
+        }
+
+        // Časovač, který nikdy neumře
+        let timerVal = 15;
+        setInterval(() => {
+            timerVal--;
+            if (timerVal <= 0) {
+                timerVal = 15;
+                fetchAllData().catch(e => console.error("Chyba časovače:", e));
+            }
+            document.getElementById('timer').innerText = timerVal + 's';
+        }, 1000);
+
+        window.onload = fetchAllData;
+    </script>
+</body>
+</html>
