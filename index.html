@@ -81,7 +81,7 @@
             <div class="pb-3.5 border-b border-tech-border mb-4 flex items-center justify-between">
                 <div>
                     <span class="text-xs text-tech-accent font-mono">SLOUPEC 01</span>
-                    <h2 class="font-bold text-xl text-slate-100 uppercase">Obec A</h2>
+                    <h2 id="title-col-1" class="font-bold text-xl text-slate-100 uppercase truncate max-w-[280px]">Obec A</h2>
                 </div>
             </div>
             <div class="mb-4 relative">
@@ -97,7 +97,7 @@
             <div class="pb-3.5 border-b border-tech-border mb-4 flex items-center justify-between">
                 <div>
                     <span class="text-xs text-tech-accent font-mono">SLOUPEC 02</span>
-                    <h2 class="font-bold text-xl text-slate-100 uppercase">Obec B</h2>
+                    <h2 id="title-col-2" class="font-bold text-xl text-slate-100 uppercase truncate max-w-[280px]">Obec B</h2>
                 </div>
             </div>
             <div class="mb-4 relative">
@@ -113,7 +113,7 @@
             <div class="pb-3.5 border-b border-tech-border mb-4 flex items-center justify-between">
                 <div>
                     <span class="text-xs text-purple-400 font-mono">SLOUPEC 03</span>
-                    <h2 class="font-bold text-xl text-purple-200 uppercase">Senátní obvod</h2>
+                    <h2 id="title-col-3" class="font-bold text-xl text-purple-200 uppercase truncate max-w-[280px]">Senátní obvod</h2>
                 </div>
             </div>
             <div class="mb-4 relative">
@@ -138,22 +138,20 @@
             statusEl.innerText = "Stahuji aktuální XML 2026 z volby.gov.cz...";
 
             try {
-                // Načtení obecních dat přes CORS proxy s ošetřením chyb
                 const kvProxy = 'https://corsproxy.io/?' + encodeURIComponent(kvUrl);
                 try {
                     const kvRes = await fetch(kvProxy + '&_t=' + new Date().getTime());
                     if (kvRes.ok) {
-                        const kvText = await kvRes.res.text();
+                        const kvText = await kvRes.text();
                         kvXmlData = new DOMParser().parseFromString(kvText, "text/xml");
                     }
                 } catch (kvErr) { console.error("Chyba načítání obecních dat:", kvErr); }
 
-                // Načtení senátních dat přes CORS proxy s ošetřením chyb
                 const seProxy = 'https://corsproxy.io/?' + encodeURIComponent(seUrl);
                 try {
                     const seRes = await fetch(seProxy + '&_t=' + new Date().getTime());
                     if (seRes.ok) {
-                        const seText = await seRes.res.text();
+                        const seText = await seRes.text();
                         seXmlData = new DOMParser().parseFromString(seText, "text/xml");
                     }
                 } catch (seErr) { console.error("Chyba načítání senátních dat:", seErr); }
@@ -170,7 +168,6 @@
         }
 
         function populateDropdowns() {
-            // Obce
             if (kvXmlData) {
                 const obceNodes = kvXmlData.querySelectorAll('OBEC, ZASTUPITELSTVO');
                 [1, 2].forEach(colId => {
@@ -186,6 +183,7 @@
                             const opt = document.createElement('option');
                             opt.value = kod;
                             opt.innerText = `${nazev} (${kod})`;
+                            opt.dataset.cleanName = nazev; // Uložíme si pouze čistý název obce
                             select.appendChild(opt);
                         }
                     });
@@ -194,7 +192,6 @@
                 });
             }
 
-            // Senát
             if (seXmlData) {
                 const selectSenat = document.getElementById('select-col-3');
                 const currentSenatVal = selectSenat.value;
@@ -209,6 +206,7 @@
                         const opt = document.createElement('option');
                         opt.value = cislo;
                         opt.innerText = `Obvod č. ${cislo} (${nazev})`;
+                        opt.dataset.cleanName = `Obvod č. ${cislo} (${nazev})`;
                         selectSenat.appendChild(opt);
                     }
                 });
@@ -224,14 +222,24 @@
         function renderColumn(colId) {
             const select = document.getElementById(`select-col-${colId}`);
             const container = document.getElementById(`col-container-${colId}`);
+            const titleEl = document.getElementById(`title-col-${colId}`);
             const selectedVal = select.value;
 
             if (!selectedVal) {
+                if (colId === 1) titleEl.innerText = "OBEC A";
+                if (colId === 2) titleEl.innerText = "OBEC B";
+                if (colId === 3) titleEl.innerText = "SENÁTNÍ OBVOD";
+
                 container.innerHTML = `<div class="p-5 bg-tech-base/40 rounded border border-tech-border/40 text-center text-sm font-mono text-slate-500">Vyberte položku ze seznamu ČSÚ.</div>`;
                 return;
             }
 
-            const selectedText = select.options[select.selectedIndex].text;
+            const selectedOption = select.options[select.selectedIndex];
+            const cleanName = selectedOption.dataset.cleanName || selectedOption.text;
+            
+            // Dynamicky přepíšeme velký nadpis sloupce
+            titleEl.innerText = cleanName;
+
             let isProcessed = false;
             let resultsHtml = '';
 
@@ -254,7 +262,7 @@
                                 <div class="mb-2.5">
                                     <div class="flex justify-between text-sm font-mono mb-1.5">
                                         <span class="text-slate-300 font-semibold">${nazev}</span>
-                                        <span class="text-slate-400">${proc}% <span class="text-slate-500">(${hlasy} h. ${mandaty ? ' | Mandáty: ' + mandaty : ''})</span></span>
+                                        <span class="text-slate-400">${proc}% <span class="text-slate-500">(${hlasy} h.${mandaty ? ' | Mandáty: ' + mandaty : ''})</span></span>
                                     </div>
                                     <div class="w-full h-2 bg-tech-base rounded-full overflow-hidden">
                                         <div class="h-full ${colId === 3 ? 'bg-purple-500' : 'bg-tech-accent'} rounded-full" style="width: ${proc}%"></div>
@@ -270,36 +278,11 @@
                 container.innerHTML = `
                     <div class="tech-glow-card bg-tech-base/80 p-5 rounded-lg">
                         <div class="flex justify-between items-center mb-3.5">
-                            <h3 class="font-bold text-base text-slate-100">${selectedText}</h3>
+                            <h3 class="font-bold text-base text-slate-100">${cleanName}</h3>
                             <span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-tech-success/10 text-tech-success border border-tech-success/30">SPOČTENO</span>
                         </div>
                         <div class="space-y-2 mt-4">${resultsHtml}</div>
                     </div>`;
             } else {
                 container.innerHTML = `
-                    <div class="tech-glow-card bg-tech-base/80 p-5 rounded-lg">
-                        <div class="flex justify-between items-center mb-3.5">
-                            <h3 class="font-bold text-base text-slate-100">${selectedText}</h3>
-                            <span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-tech-warning/10 text-tech-warning border border-tech-warning/30 animate-pulse">SČÍTÁ SE</span>
-                        </div>
-                        <div class="p-5 bg-tech-base/40 rounded border border-tech-border/40 text-center text-sm font-mono text-slate-500">
-                            V XML souboru z volby.gov.cz zatím pro tuto položku nebyly publikovány podrobné výsledky.
-                        </div>
-                    </div>`;
-            }
-        }
-
-        let timerVal = 15;
-        setInterval(() => {
-            timerVal--;
-            if (timerVal <= 0) {
-                timerVal = 15;
-                fetchAllData();
-            }
-            document.getElementById('timer').innerText = timerVal + 's';
-        }, 1000);
-
-        window.onload = fetchAllData;
-    </script>
-</body>
-</html>
+                    <div class="tech-glow-card bg-
